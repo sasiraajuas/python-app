@@ -22,6 +22,17 @@ jobs:
         IMAGE_TAG=${{ secrets.DOCKER_USERNAME }}/my-image:latest
         docker build . --file Dockerfile --tag $IMAGE_TAG
         echo "IMAGE_TAG=$IMAGE_TAG" >> $GITHUB_ENV
+        
+    - name: Save Docker image to tar file
+      run: |
+        docker save -o my-image.tar $IMAGE_TAG
+
+    - name: Upload Docker image as artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: docker-image-artifact
+        path: my-image.tar
+
 
     - name: Push Docker image to Docker Hub
       run: docker push $IMAGE_TAG
