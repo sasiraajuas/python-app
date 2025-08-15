@@ -55,6 +55,7 @@ steps:
         --memory 1 \
         --location ${{ parameters.region }} \
         --dns-name-label $DNS_LABEL \
+        --os-type Linux \
         --registry-login-server $ACR_NAME.azurecr.io \
         --registry-username $ACR_USERNAME \
         --registry-password $ACR_PASSWORD
