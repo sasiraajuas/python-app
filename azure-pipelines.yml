@@ -15,9 +15,9 @@ parameters:
     default: 'python-app-container-ado'
 
 variables:
-  ACR_NAME: 'containersr'                    # Replace with your ACR name
-  IMAGE_NAME: 'python-app-ado'                # Replace with your image name
-  RESOURCE_GROUP: 'Container'  # Replace with your resource group
+  ACR_NAME: 'containersr'
+  IMAGE_NAME: 'python-app-ado'
+  RESOURCE_GROUP: 'Container'
   DNS_LABEL: '$(IMAGE_NAME)-$(Build.BuildId)'
 
 pool:
@@ -26,7 +26,7 @@ pool:
 steps:
 - task: AzureCLI@2
   inputs:
-    azureSubscription: 'AzureConnectionContainer'  # Your automatic service connection name
+    azureSubscription: 'AzureConnectionContainer'
     scriptType: 'bash'
     scriptLocation: 'inlineScript'
     inlineScript: |
@@ -39,8 +39,22 @@ steps:
       echo "Pushing Docker image to ACR..."
       docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ parameters.version }}
 
+      echo "Getting ACR credentials..."
+      ACR_USERNAME=$(az acr credential show --name $ACR_NAME --query "username" -o tsv)
+      ACR_PASSWORD=$(az acr credential show --name $ACR_NAME --query "passwords[0].value" -o tsv)
+
       echo "Setting DNS label..."
-      export DNS_LABEL=${IMAGE_NAME}-${{ parameters.region }}-${BUILD_BUILDID}
+      DNS_LABEL=${IMAGE_NAME}-${{ parameters.region }}-${BUILD_BUILDID}
+
+      echo "Checking if container already exists..."
+      EXISTS=$(az container show --resource-group $RESOURCE_GROUP --name ${{ parameters.containerName }} --query "name" -o tsv || echo "")
+
+      if [ "$EXISTS" = "${{ parameters.containerName }}" ]; then
+        echo "Container exists. Deleting..."
+        az container delete --resource-group $RESOURCE_GROUP --name ${{ parameters.containerName }} --yes
+      else
+        echo "No existing container found. Proceeding..."
+      fi
 
       echo "Deploying to Azure Container Instance..."
       az container create \
@@ -50,4 +64,7 @@ steps:
         --cpu 1 \
         --memory 1 \
         --location ${{ parameters.region }} \
-        --dns-name-label $DNS_LABEL
+        --dns-name-label $DNS_LABEL \
+        --registry-login-server $ACR_NAME.azurecr.io \
+        --registry-username $ACR_USERNAME \
+        --registry-password $ACR_PASSWORD
