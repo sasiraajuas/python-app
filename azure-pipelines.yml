@@ -1,19 +1,53 @@
-# Starter pipeline
-# Start with a minimal pipeline that you can customize to build and deploy your code.
-# Add steps that build, run tests, deploy, and more:
-# https://aka.ms/yaml
-
 trigger:
-- main
+  branches:
+    include:
+      - main
+
+parameters:
+  - name: version
+    type: string
+    default: 'latest'
+  - name: region
+    type: string
+    default: 'westeurope'
+  - name: containerName
+    type: string
+    default: 'python-app-container-ado'
+
+variables:
+  ACR_NAME: 'containersr'                    # Replace with your ACR name
+  IMAGE_NAME: 'python-app-ado'                # Replace with your image name
+  RESOURCE_GROUP: 'Container'  # Replace with your resource group
+  DNS_LABEL: '$(IMAGE_NAME)-$(Build.BuildId)'
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 steps:
-- script: echo Hello, world!
-  displayName: 'Run a one-line script'
+- task: AzureCLI@2
+  inputs:
+    azureSubscription: 'AzureConnectionContainer'  # Your automatic service connection name
+    scriptType: 'bash'
+    scriptLocation: 'inlineScript'
+    inlineScript: |
+      echo "Logging into ACR..."
+      az acr login --name $ACR_NAME
 
-- script: |
-    echo Add other tasks to build, test, and deploy your project.
-    echo See https://aka.ms/yaml
-  displayName: 'Run a multi-line script'
+      echo "Building Docker image..."
+      docker build -t $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ parameters.version }} .
+
+      echo "Pushing Docker image to ACR..."
+      docker push $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ parameters.version }}
+
+      echo "Setting DNS label..."
+      export DNS_LABEL=${IMAGE_NAME}-${{ parameters.region }}-${BUILD_BUILDID}
+
+      echo "Deploying to Azure Container Instance..."
+      az container create \
+        --resource-group $RESOURCE_GROUP \
+        --name ${{ parameters.containerName }} \
+        --image $ACR_NAME.azurecr.io/$IMAGE_NAME:${{ parameters.version }} \
+        --cpu 1 \
+        --memory 1 \
+        --location ${{ parameters.region }} \
+        --dns-name-label $DNS_LABEL
