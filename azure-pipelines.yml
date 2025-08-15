@@ -46,16 +46,6 @@ steps:
       echo "Setting DNS label..."
       DNS_LABEL=${IMAGE_NAME}-${{ parameters.region }}-${BUILD_BUILDID}
 
-      echo "Checking if container already exists..."
-      EXISTS=$(az container show --resource-group $RESOURCE_GROUP --name ${{ parameters.containerName }} --query "name" -o tsv || echo "")
-
-      if [ "$EXISTS" = "${{ parameters.containerName }}" ]; then
-        echo "Container exists. Deleting..."
-        az container delete --resource-group $RESOURCE_GROUP --name ${{ parameters.containerName }} --yes
-      else
-        echo "No existing container found. Proceeding..."
-      fi
-
       echo "Deploying to Azure Container Instance..."
       az container create \
         --resource-group $RESOURCE_GROUP \
